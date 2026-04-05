@@ -1,0 +1,76 @@
+{
+  "entities": {
+    "Equipment": {
+      "title": "Equipment",
+      "description": "A piece of equipment (AHU or Pantry) assigned to a floor.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "floorNumber": { "type": "integer", "enum": [4, 5, 6, 7] },
+        "equipmentType": { "type": "string", "enum": ["AHU", "Pantry"] },
+        "ahuNumber": { "type": "integer", "description": "For AHUs (1-4)" },
+        "wing": { "type": "string", "enum": ["A", "B"], "description": "For Pantries" },
+        "userId": { "type": "string" }
+      },
+      "required": ["floorNumber", "equipmentType", "userId"]
+    },
+    "Reading": {
+      "title": "Reading",
+      "description": "An energy audit reading for a piece of equipment.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "floorNumber": { "type": "integer" },
+        "equipmentType": { "type": "string", "enum": ["AHU", "Pantry"] },
+        "ahuNumber": { "type": "integer" },
+        "wing": { "type": "string", "enum": ["A", "B"] },
+        "initialValue": { "type": "number" },
+        "finalValue": { "type": "number" },
+        "consumption": { "type": "number" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "userId": { "type": "string" }
+      },
+      "required": ["floorNumber", "equipmentType", "initialValue", "finalValue", "consumption", "timestamp", "userId"]
+    },
+    "User": {
+      "title": "User",
+      "description": "User profile with role.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "role": { "type": "string", "enum": ["Admin", "Manager", "Auditor", "Viewer"] }
+      },
+      "required": ["email", "role"]
+    },
+    "SharedAccess": {
+      "title": "SharedAccess",
+      "description": "Access permissions for a user.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "accessLevel": { "type": "string", "enum": ["read", "edit"] }
+      },
+      "required": ["userId", "accessLevel"]
+    }
+  },
+  "firestore": {
+    "/equipment/{equipmentId}": {
+      "schema": "Equipment",
+      "description": "Pre-populated list of equipment per user."
+    },
+    "/readings/{readingId}": {
+      "schema": "Reading",
+      "description": "Energy audit readings."
+    },
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles and roles."
+    },
+    "/shared_access/{accessId}": {
+      "schema": "SharedAccess",
+      "description": "Granular access permissions."
+    }
+  }
+}

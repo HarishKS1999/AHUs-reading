@@ -1,0 +1,117 @@
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// Collection: readings
+// Document ID: auto-generated
+// Fields:
+//   - equipmentName: string (required, 1-100 chars)
+//   - floor: number (required, 4, 5, 6, or 7)
+//   - initialValue: number (required, positive)
+//   - finalValue: number (required, positive, >= initialValue)
+//   - consumption: number (required, finalValue - initialValue)
+//   - date: string (required, ISO 8601)
+//   - userId: string (required, matches auth.uid)
+//
+// ===============================================================
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        ((exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Admin') ||
+         (request.auth.token.email == "ksharish1999@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isManager() {
+      return isAuthenticated() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Manager';
+    }
+
+    function isAuditor() {
+      return isAuthenticated() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Auditor';
+    }
+
+    function isViewer() {
+      return isAuthenticated() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Viewer';
+    }
+
+    function hasReadAccess() {
+      return isAdmin() || isManager() || isAuditor() || isViewer();
+    }
+
+    function hasEditAccess() {
+      return isAdmin() || isManager() || isAuditor();
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isValidEquipment(data) {
+      return data.floorNumber in [4, 5, 6, 7] &&
+             data.equipmentType in ['AHU', 'Pantry'] &&
+             (data.equipmentType == 'AHU' ? data.ahuNumber in [1, 2, 3, 4] : data.wing in ['A', 'B']) &&
+             data.userId is string;
+    }
+
+    function isValidReading(data) {
+      return data.floorNumber in [4, 5, 6, 7] &&
+             data.equipmentType in ['AHU', 'Pantry'] &&
+             (data.equipmentType == 'AHU' ? data.ahuNumber in [1, 2, 3, 4] : data.wing in ['A', 'B']) &&
+             data.initialValue is number && data.initialValue >= 0 &&
+             data.finalValue is number && data.finalValue >= data.initialValue &&
+             data.consumption is number && 
+             (math.abs(data.consumption - (data.finalValue - data.initialValue)) < 0.0001) &&
+             data.timestamp is string && data.timestamp.matches("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.*Z?$") &&
+             data.userId is string &&
+             (!('updatedAt' in data) || data.updatedAt is string);
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /equipment/{equipmentId} {
+      allow read: if hasReadAccess();
+      allow create: if hasEditAccess() && isValidEquipment(request.resource.data);
+      allow delete: if hasEditAccess();
+      allow update: if false;
+    }
+
+    match /readings/{readingId} {
+      allow read: if hasReadAccess();
+      allow create: if hasEditAccess() && isValidReading(request.resource.data);
+      allow update: if hasEditAccess() && isValidReading(request.resource.data);
+      allow delete: if hasEditAccess();
+    }
+
+    match /users/{userId} {
+      allow read: if isAdmin() || isOwner(userId);
+      allow create: if isOwner(userId);
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
